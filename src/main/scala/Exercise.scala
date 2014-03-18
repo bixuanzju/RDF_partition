@@ -2,9 +2,6 @@ import org.apache.spark
 import org.apache.spark._
 import org.apache.spark.SparkContext._
 
-// import org.apache.spark.graphx._
-// import org.apache.spark.rdd.RDD
-
 object SimpleExercise {
 
   def main(args: Array[String]) = {
@@ -32,20 +29,47 @@ object SimpleExercise {
     // // Intersection of two RDDs
     // (subset1 subtract (subset1 subtract subset2)).collect.foreach(println)
 
-    val file = sc.textFile("/Users/jeremybi/Desktop/standard_data/output0_0")
+    val file1 = sc.textFile("/Users/jeremybi/Desktop/standard_data/output0_0")
 
-    file.map(line => line.split("&")).
+    file1.map(line => line.split("&")).
       map(triple => (triple(1), (triple(0), triple(2)))).
       groupByKey.collect.foreach(pair => writeToFiles(sc, pair))
+
+    val regex1 = "\\((<.*>),<(.*)>\\)".r
+    val regex2 = ".*#([a-zA-Z]+)$".r
+
+    val file2 = sc.textFile("hdfs://localhost:9000/user/jeremybi/type")
+
+    val classTuples = file2.map {
+      case regex1(sb, ob) => {
+        val subTypeName = ob match {
+          case regex2(subtype) => subtype
+          case _ => "noMatch"
+        }
+          (subTypeName, sb)
+      }
+      case _ => ("noMatch", "noMatch")
+    }.groupByKey
+
+    classTuples.collect.foreach(pair => divideByType(sc, pair))
 
     sc.stop()
   }
 
   def writeToFiles(sc: SparkContext, pair: (String, Seq[(String, String)])) = {
     val regex = ".*#([a-zA-Z]+)>".r
-    val result = pair._1 match { case regex(m) => m; case _ => "nomatch" }
+    val result = pair._1 match {
+      case regex(m) => m
+      case _ => "noMatch"
+    }
+
     sc.parallelize(pair._2).
       saveAsTextFile("hdfs://localhost:9000/user/jeremybi/" ++ result)
+  }
+
+  def divideByType(sc: SparkContext, pair: (String, Seq[String])) {
+    sc.parallelize(pair._2).
+      saveAsTextFile("hdfs://localhost:9000/user/jeremybi/type/" ++ pair._1)
   }
 
 }
