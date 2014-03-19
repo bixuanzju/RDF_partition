@@ -8,68 +8,58 @@ object SimpleExercise {
     val conf = new SparkConf()
       .setMaster("local")
       .setAppName("Exercise")
-      .setJars(List("target/scala-2.10/exercise-assembly-1.0.jar"))
+      .setJars(List("target/scala-2.10/exercise-project_2.10-1.0.jar"))
       .setSparkHome("/Users/jeremybi/spark-0.9.0-incubating-bin-hadoop1")
     val sc = new SparkContext(conf)
 
-    // val graph = Graph.fromEdges(
-    // sc.textFile("/Users/jeremybi/graph_data").
-    //     map(line => line.split(" ")).
-    //     map(componet => Edge(componet(0).toInt, componet(2).toInt, componet(1)))
-    //     ,1).cache()
 
-    // val subset1 = graph.subgraph(epred = triplet =>
-    //   triplet.attr == "4" && triplet.dstId == 5
-    // ).triplets.map(triplet => triplet.srcId)
 
-    // val subset2 = graph.subgraph(epred = triplet =>
-    //   triplet.attr == "2" && triplet.dstId == 3
-    // ).triplets.map(triplet => triplet.srcId)
-
-    // // Intersection of two RDDs
-    // (subset1 subtract (subset1 subtract subset2)).collect.foreach(println)
-
+    // Divide by predicate
     val file1 = sc.textFile("/Users/jeremybi/Desktop/standard_data/output0_0")
+    
+    // predicatePair is RDD[(predicate, [(subject, object)])]
+    val predicatePair = file1.map(line => line.split("&")).
+      map(triple => {
+            val regex = ".*#([a-zA-Z]+)>".r
+            val predicate = triple(1) match {
+              case regex(pred) => pred
+              case _ => "noMatch"
+            }
 
-    file1.map(line => line.split("&")).
-      map(triple => (triple(1), (triple(0), triple(2)))).
-      groupByKey.collect.foreach(pair => writeToFiles(sc, pair))
+            (predicate, (triple(0), triple(2)))
+          
+          }).groupByKey
 
-    val regex1 = "\\((<.*>),<(.*)>\\)".r
-    val regex2 = ".*#([a-zA-Z]+)$".r
+    predicatePair.collect.foreach(pair => writeToHDFS(sc, pair, ""))
 
-    val file2 = sc.textFile("hdfs://localhost:9000/user/jeremybi/type")
 
-    val classTuples = file2.map {
-      case regex1(sb, ob) => {
-        val subTypeName = ob match {
-          case regex2(subtype) => subtype
-          case _ => "noMatch"
-        }
-          (subTypeName, sb)
-      }
-      case _ => ("noMatch", "noMatch")
-    }.groupByKey
+    // Divide by object in type predicate
 
-    classTuples.collect.foreach(pair => divideByType(sc, pair))
+    // objectPair is [(subject, object)]
+    val objectPair = predicatePair.
+      filter(pair => pair._1 == "type").
+      first._2.
+      map(truple => {
+            val regex2 = "<.*#([a-zA-Z]+)>$".r
+            val subName =  truple._2 match {
+              case regex2(subtype) => subtype
+              case _ => "noMatch"
+            }
+
+            (subName, truple._1)
+          })
+
+    // subjectPair is RDD[(subject, [object])]
+    val subjectPair = sc.parallelize(objectPair).groupByKey
+
+    subjectPair.collect.foreach(pair => writeToHDFS(sc, pair, "type/"))
 
     sc.stop()
   }
 
-  def writeToFiles(sc: SparkContext, pair: (String, Seq[(String, String)])) = {
-    val regex = ".*#([a-zA-Z]+)>".r
-    val result = pair._1 match {
-      case regex(m) => m
-      case _ => "noMatch"
-    }
-
+  def writeToHDFS(sc: SparkContext, pair: (String, Seq[AnyRef]), path: String) = {
     sc.parallelize(pair._2).
-      saveAsTextFile("hdfs://localhost:9000/user/jeremybi/" ++ result)
+      saveAsTextFile("hdfs://localhost:9000/user/jeremybi/" ++ path ++ pair._1)
   }
-
-  def divideByType(sc: SparkContext, pair: (String, Seq[String])) {
-    sc.parallelize(pair._2).
-      saveAsTextFile("hdfs://localhost:9000/user/jeremybi/type/" ++ pair._1)
-  }
-
+  
 }
