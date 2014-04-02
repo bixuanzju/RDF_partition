@@ -13,14 +13,14 @@ object SimpleExercise {
       .setJars(List("target/scala-2.10/exercise-project_2.10-1.0.jar"))
       .setSparkHome("/Users/jeremybi/spark-0.9.0-incubating-bin-hadoop1")
     val sc = new SparkContext(conf)
+    val filePath = "/Users/jeremybi/Desktop/standard_data/output0_0"
 
 
     // Step 1
     // Divide by predicate
-    val file1 = sc.textFile("/Users/jeremybi/Desktop/standard_data/output0_0")
-      
     // predicatePair is RDD[(predicate, [(subject, object)])]
-    val predicatePair = file1.map(line => line.split("&")).
+    val predicatePair = sc.textFile(filePath).
+      map(line => line.split("&")).
       map(triple => {
             val Regex = ".*#([a-zA-Z]+)>".r
             val predicate = triple(1) match {
@@ -29,7 +29,7 @@ object SimpleExercise {
             }
 
             (predicate, (triple(0), triple(2)))
-              
+
           }).groupByKey.cache
 
 
@@ -100,15 +100,14 @@ object SimpleExercise {
                       "_" ++ pair._1 ++ "_" ++ tuple._1._2)
         )
       )
-    
+
 
     sc.stop()
   }
 
-  def writeToHDFS(sc: SparkContext, seq: Seq[AnyRef], path: String) = {
+  def writeToHDFS(sc: SparkContext, seq: Seq[AnyRef], path: String) =
     sc.parallelize(seq).
       saveAsTextFile("hdfs://localhost:9000/user/jeremybi/" ++ path)
-  }
 
   def findClass(obj: String, map: Map[String, Seq[(String, String)]]) =
     map.foldLeft("noMatch")((flag, pair) =>
