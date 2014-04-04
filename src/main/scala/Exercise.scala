@@ -37,12 +37,13 @@ object SimpleExercise {
     // Subdivide by object in type predicate
     // classPair is Map[class, Seq(class, object)]
     val classPair = predicatePair.
-      filter(pair => pair._1 == "type").
-      first._2.
+      filter {
+        case (pred, _) => pred == "type"
+      }.first._2.
       map(truple => {
-            val Regex2 = "<.*#([a-zA-Z]+)>$".r
+            val Regex = "<.*#([a-zA-Z]+)>$".r
             val objName =  truple._2 match {
-              case Regex2(subtype) => subtype
+              case Regex(subtype) => subtype
               case _ => "noMatch"
             }
 
@@ -69,6 +70,7 @@ object SimpleExercise {
         )
       )
 
+
     // by subject
     val split2 = predicatePair.filter(pair => pair._1 != "type").
       map(pair =>
@@ -82,6 +84,8 @@ object SimpleExercise {
           writeToHDFS(sc, tuple._2, pair._1 ++ "/" ++ tuple._1 ++ "_" ++ pair._1)
         )
       )
+
+
 
     // by subject and object
     val split3 = predicatePair.filter(pair => pair._1 != "type").
