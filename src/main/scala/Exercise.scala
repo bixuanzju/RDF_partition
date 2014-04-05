@@ -15,7 +15,6 @@ object SimpleExercise {
     val sc = new SparkContext(conf)
     val filePath = "/Users/jeremybi/Desktop/standard_data/output0_0"
 
-
     // Step 1
     // Divide by predicate
     // predicatePair is RDD[(predicate, [(subject, object)])]
@@ -32,7 +31,6 @@ object SimpleExercise {
 
           }).groupByKey.cache
 
-
     // Step 2
     // Subdivide by object in type predicate
     // classPair is Map[class, Seq(class, object)]
@@ -42,7 +40,7 @@ object SimpleExercise {
       }.first._2.
       map(truple => {
             val Regex = "<.*#([a-zA-Z]+)>$".r
-            val objName =  truple._2 match {
+            val objName = truple._2 match {
               case Regex(subtype) => subtype
               case _ => "noMatch"
             }
@@ -51,7 +49,6 @@ object SimpleExercise {
           }).groupBy(_._1)
 
     classPair.foreach(pair => writeToHDFS(sc, pair._2, "type/" ++ pair._1))
-
 
     // Step 3
     // Subdivide all predicates other than type predicate
@@ -64,12 +61,9 @@ object SimpleExercise {
            groupBy(_._1)))
 
     split1.collect.
-      foreach(pair =>   // (predicate, Map[class, Seq[(class, (s,o))]])
+      foreach(pair => // (predicate, Map[class, Seq[(class, (s,o))]])
         pair._2.foreach(tuple => // (class, Seq[(class, (s,o))])
-          writeToHDFS(sc, tuple._2, pair._1 ++ "/" ++ pair._1 ++ "_" ++ tuple._1)
-        )
-      )
-
+          writeToHDFS(sc, tuple._2, pair._1 ++ "/" ++ pair._1 ++ "_" ++ tuple._1)))
 
     // by subject
     val split2 = predicatePair.filter(pair => pair._1 != "type").
@@ -79,13 +73,9 @@ object SimpleExercise {
            groupBy(_._1)))
 
     split2.collect.
-      foreach(pair =>   // (predicate, Map[class, Seq[(class, (s,o))]])
+      foreach(pair => // (predicate, Map[class, Seq[(class, (s,o))]])
         pair._2.foreach(tuple => // (class, Seq[(class, (s,o))])
-          writeToHDFS(sc, tuple._2, pair._1 ++ "/" ++ tuple._1 ++ "_" ++ pair._1)
-        )
-      )
-
-
+          writeToHDFS(sc, tuple._2, pair._1 ++ "/" ++ tuple._1 ++ "_" ++ pair._1)))
 
     // by subject and object
     val split3 = predicatePair.filter(pair => pair._1 != "type").
@@ -101,10 +91,7 @@ object SimpleExercise {
         pair._2.foreach(tuple => // ((class, class), Seq[((class,class), (s,o))])
           writeToHDFS(sc, tuple._2,
                       pair._1 ++ "/" ++ tuple._1._1 ++
-                      "_" ++ pair._1 ++ "_" ++ tuple._1._2)
-        )
-      )
-
+                        "_" ++ pair._1 ++ "_" ++ tuple._1._2)))
 
     sc.stop()
   }
@@ -117,7 +104,6 @@ object SimpleExercise {
     map.foldLeft("noMatch")((flag, pair) =>
       if (pair._2 contains (pair._1, obj))
         pair._1
-      else flag
-    )
+      else flag)
 
 }
