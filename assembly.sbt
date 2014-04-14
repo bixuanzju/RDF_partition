@@ -15,4 +15,4 @@ mergeStrategy in assembly <<= (mergeStrategy in assembly) { (old) =>
   }
 }
 
-jarName in assembly := "exercise-assembly-1.0.jar"
+jarName in assembly := "rdf-partitioner-1.0.jar"
