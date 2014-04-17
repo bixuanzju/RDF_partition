@@ -10,23 +10,23 @@ object RDFPartitioner {
     val conf = new SparkConf()
       .setMaster("local")
       .setAppName("Exercise")
-      .setJars(List("/Users/jeremybi/scratch/scala/exercise/target/scala-2.10/exercise-assembly-1.0.jar"))
+      .setJars(List("/Users/jeremybi/scratch/scala/exercise/target/scala-2.10/rdf-partitioner-1.0.jar"))
       .setSparkHome("/Users/jeremybi/spark-0.9.1-bin-hadoop1")
     val sc = new SparkContext(conf)
     // val mapPath = "/Users/jeremybi/Desktop/standard_data/data/mapping/part-r-00000"
-    val filePath = "/Users/jeremybi/Desktop/standard_data/data/compress/part-r-00000"
-    val typeHash = "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>".hashCode
+    val filePath = "/Users/jeremybi/Desktop/new_data/compress/part-r-00000"
+    val typeHash = -1425683616493199L
 
     // val hashMap = sc.textFile(mapPath).
     //   map(line => line.split(" ")).
-    //   map(array => (array(0).toInt, (array(1)))).collect.toMap
+    //   map(array => (array(0).toLong, (array(1)))).collect.toMap
 
     // Step 1
     // Divide by predicate
     // predicatePair is RDD[(predicate, [(subject, object)])]
     val predicatePair = sc.textFile(filePath).
       map(line => line.split(" ")).
-      map(triple => (triple(1).toInt, (triple(0).toInt, triple(2).toInt))).
+      map(triple => (triple(1).toLong, (triple(0).toLong, triple(2).toLong))).
       groupByKey
 
     // Step 2
@@ -96,7 +96,7 @@ object RDFPartitioner {
       saveAsTextFile("hdfs://localhost:9000/user/jeremybi/" + path)
       // saveAsTextFile("/Users/jeremybi/output.txt")
 
-  def findClass(obj: Int, map: Map[Int, Int]): Int =
+  def findClass(obj: Long, map: Map[Long, Long]): Long =
     map.get(obj) match {
       case Some(cls) => cls
       case None => -1
