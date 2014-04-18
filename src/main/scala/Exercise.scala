@@ -8,13 +8,13 @@ object RDFPartitioner {
 
     // Initialization
     val conf = new SparkConf()
-      .setMaster("local")
-      .setAppName("Exercise")
-      .setJars(List("/Users/jeremybi/scratch/scala/exercise/target/scala-2.10/rdf-partitioner-1.0.jar"))
-      .setSparkHome("/Users/jeremybi/spark-0.9.1-bin-hadoop1")
+      .setMaster("spark://192.168.0.246:7077")
+      .setAppName("RDFPartition")
+      .setJars(SparkContext.jarOfClass(this.getClass))
+      .setSparkHome(System.getenv("SPARK_HOME"))
     val sc = new SparkContext(conf)
     // val mapPath = "/Users/jeremybi/Desktop/standard_data/data/mapping/part-r-00000"
-    val filePath = "/Users/jeremybi/Desktop/new_data/compress/part-r-00000"
+    val filePath = "hdfs://192.168.0.246:9000/user/root/input_file"
     val typeHash = -1425683616493199L
 
     // val hashMap = sc.textFile(mapPath).
@@ -93,8 +93,7 @@ object RDFPartitioner {
 
   def writeToHDFS(sc: SparkContext, seq: Seq[Any], path: String) =
     sc.parallelize(seq).
-      saveAsTextFile("hdfs://localhost:9000/user/jeremybi/" + path)
-      // saveAsTextFile("/Users/jeremybi/output.txt")
+      saveAsTextFile("hdfs://192.168.0.246:9000/user/root/" + path)
 
   def findClass(obj: Long, map: Map[Long, Long]): Long =
     map.get(obj) match {
