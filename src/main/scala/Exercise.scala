@@ -93,7 +93,7 @@ object RDFPartitioner {
 
   def writeToHDFS(sc: SparkContext, seq: Seq[Any], path: String) =
     sc.parallelize(seq).
-      saveAsTextFile("hdfs://localhost:9000/user/jeremybi/" + path)
+      saveAsTextFile("hdfs://localhost:9000/user/jeremybi/partitions/" + path)
       // saveAsTextFile("/Users/jeremybi/output.txt")
 
   def findClass(obj: Long, map: Map[Long, Long]): Long =
