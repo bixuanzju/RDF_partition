@@ -42,37 +42,33 @@ object RDFPartitioner {
     // by object
     val split1 = otherPredic.
       mapValues(pairSeq =>
-         groupTuples(pairSeq.map(tuple => (findClass(tuple._2, classPair.value), tuple))))
-
+        pairSeq.map(tuple => (findClass(tuple._2, classPair.value), tuple)).groupBy(_._1))
 
     split1.collect.
-      foreach(pair => // (predicate, Map[class, Seq[(s,o)]])
-        pair._2.foreach(tuple => // (class, Seq[(s,o)])
-          writeToHDFS(sc, tuple._2, "ff" + pair._1 + "_" + tuple._1)))
+      foreach(pair => // (predicate, Map[class, Seq[(class, (s,o))]])
+        pair._2.foreach(tuple => // (class, Seq[(class, (s,o))])
+          writeToHDFS(sc, tuple._2.map(_._2), "ff" + pair._1 + "_" + tuple._1)))
 
-    // // by subject
-    // val split2 = otherPredic.
-    //   map(pair =>
-    //     (pair._1,
-    //      groupTuples(pair._2.map(tuple => (findClass(tuple._1, classPair.value), tuple)))))
+    // by subject
+    val split2 = otherPredic.
+      mapValues(pairSeq =>
+        pairSeq.map(tuple => (findClass(tuple._1, classPair.value), tuple)).groupBy(_._1))
 
-    // split2.collect.
-    //   foreach(pair => // (predicate, Map[class, Seq[(s,o)]])
-    //     pair._2.foreach(tuple => // (class, Seq[(s,o)])
-    //       writeToHDFS(sc, tuple._2, "ff" + tuple._1 + "_" + pair._1)))
+    split2.collect.
+      foreach(pair => // (predicate, Map[class, Seq[(class, (s,o))]])
+        pair._2.foreach(tuple => // (class, Seq[(class, (s,o))])
+          writeToHDFS(sc, tuple._2.map(_._2), "ff" + tuple._1 + "_" + pair._1)))
 
-    // // by subject and object
-    // val split3 = otherPredic.
-    //   map(pair =>
-    //     (pair._1,
-    //      groupTuples(pair._2.map(tuple =>
-    //                    ((findClass(tuple._1, classPair.value), findClass(tuple._2, classPair.value)),
-    //                     tuple)))))
+    // by subject and object
+    val split3 = otherPredic.
+      mapValues(pairSeq =>
+        pairSeq. map(tuple =>
+          ((findClass(tuple._1, classPair.value), findClass(tuple._2, classPair.value)), tuple)). groupBy(_._1))
 
-    // split3.collect.
-    //   foreach(pair => // (predicate, Map[(class, class), Seq[(s,o)])
-    //     pair._2.foreach(tuple => // ((class, class), Seq[(s,o)])
-    //       writeToHDFS(sc, tuple._2, "ff" + tuple._1._1 + "_" + pair._1 + "_" + tuple._1._2)))
+    split3.collect.
+      foreach(pair => // (predicate, Map[(class, class), Seq[((class,class), (s,o))]])
+        pair._2.foreach(tuple => // ((class, class), Seq[((class,class), (s,o))])
+          writeToHDFS(sc, tuple._2.map(_._2), "ff" + tuple._1._1 + "_" + pair._1 + "_" + tuple._1._2)))
 
     sc.stop()
   }
@@ -86,8 +82,5 @@ object RDFPartitioner {
       case Some(cls) => cls
       case None => -1
     }
-
-  def groupTuples[A,B](seq: Seq[(A,B)]) =
-    seq groupBy (_._1) mapValues (_ map (_._2))
 
 }
