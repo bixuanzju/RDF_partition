@@ -8,13 +8,15 @@ object RDFPartitioner {
 
     // Initialization
     val conf = new SparkConf()
-      .setMaster("spark://192.168.0.246:7077")
+      .setMaster("spark://192.168.0.250:7077")
       .setAppName("RDFPartition")
       .setJars(SparkContext.jarOfClass(this.getClass))
       .setSparkHome(System.getenv("SPARK_HOME"))
+      .set("spark.executor.memory", "10g")
+
     val sc = new SparkContext(conf)
     // val mapPath = "/Users/jeremybi/Desktop/standard_data/data/mapping/part-r-00000"
-    val filePath = "hdfs://192.168.0.246:9000/user/root/input_file"
+    val filePath = "hdfs://192.168.0.250:9000/user/root/input_file"
     val typeHash = -1425683616493199L
 
     // val hashMap = sc.textFile(mapPath).
@@ -27,25 +29,20 @@ object RDFPartitioner {
     val predicatePair = sc.textFile(filePath).
       map(line => line.split(" ")).
       map(triple => (triple(1).toLong, (triple(0).toLong, triple(2).toLong))).
-      groupByKey
+      groupByKey.partitionBy(new HashPartitioner(3))
 
     // Step 2
     // Subdivide by object in type predicate
     // classPair is Map[object, class]
-    val classPair  = sc.broadcast(predicatePair.filter {
-                                    case (pred, _) => pred == typeHash
-                                  }.first._2.toMap)
+    val classPair  = sc.broadcast(predicatePair.lookup(typeHash)(0).toMap)
 
     val otherPredic = predicatePair.filter(pair => pair._1 != typeHash)
 
+    val classPairs =
+      sc.parallelize(predicatePair.lookup(typeHash)(0)).
+      map(truple => (truple._2, truple._1)).groupByKey
 
-    val classPairs = predicatePair.
-      filter {
-        case (pred, _) => pred == typeHash
-      }.first._2.
-      map(truple => (truple._2, truple._1)).groupBy(_._1)
-
-    classPairs.foreach(pair => writeToHDFS(sc, pair._2.map(_._2), "ff" + pair._1))
+    // classPairs.foreach(pair => writeToHDFS(sc, pair._2.map(_._2), "ff" + pair._1))
 
     // Step 3
     // Subdivide all predicates other than type predicate
@@ -93,7 +90,7 @@ object RDFPartitioner {
 
   def writeToHDFS(sc: SparkContext, seq: Seq[Any], path: String) =
     sc.parallelize(seq).
-      saveAsTextFile("hdfs://192.168.0.246:9000/user/root/" + path)
+      saveAsTextFile("hdfs://192.168.0.250:9000/user/root/partitions/" + path)
 
   def findClass(obj: Long, map: Map[Long, Long]): Long =
     map.get(obj) match {
