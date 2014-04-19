@@ -8,20 +8,12 @@ object RDFPartitioner {
 
     // Initialization
     val conf = new SparkConf()
-      .setMaster("spark://192.168.0.250:7077")
+      .setMaster("local")
       .setAppName("RDFPartition")
-      .setJars(SparkContext.jarOfClass(this.getClass))
-      .setSparkHome(System.getenv("SPARK_HOME"))
-      .set("spark.executor.memory", "10g")
 
     val sc = new SparkContext(conf)
-    // val mapPath = "/Users/jeremybi/Desktop/standard_data/data/mapping/part-r-00000"
-    val filePath = "hdfs://192.168.0.250:9000/user/root/input_file"
+    val filePath = "/Users/jeremybi/Desktop/new_data/compress/part-r-00000"
     val typeHash = -1425683616493199L
-
-    // val hashMap = sc.textFile(mapPath).
-    //   map(line => line.split(" ")).
-    //   map(array => (array(0).toLong, (array(1)))).collect.toMap
 
     // Step 1
     // Divide by predicate
@@ -29,72 +21,73 @@ object RDFPartitioner {
     val predicatePair = sc.textFile(filePath).
       map(line => line.split(" ")).
       map(triple => (triple(1).toLong, (triple(0).toLong, triple(2).toLong))).
-      groupByKey.partitionBy(new HashPartitioner(3))
+      groupByKey
 
     // Step 2
     // Subdivide by object in type predicate
     // classPair is Map[object, class]
     val classPair  = sc.broadcast(predicatePair.lookup(typeHash)(0).toMap)
 
-    val otherPredic = predicatePair.filter(pair => pair._1 != typeHash)
-
     val classPairs =
       sc.parallelize(predicatePair.lookup(typeHash)(0)).
-      map(truple => (truple._2, truple._1)).groupByKey
+      map(_.swap).groupByKey
 
-    // classPairs.foreach(pair => writeToHDFS(sc, pair._2.map(_._2), "ff" + pair._1))
+    classPairs.collect.foreach(pair => writeToHDFS(sc, pair._2, "ff" + pair._1))
+
+    val otherPredic = predicatePair.filter(pair => pair._1 != typeHash)
 
     // Step 3
     // Subdivide all predicates other than type predicate
 
     // by object
     val split1 = otherPredic.
-      map(pair =>
-        (pair._1, pair._2.
-           map(tuple => (findClass(tuple._2, classPair.value), tuple)).
-           groupBy(_._1)))
+      mapValues(pairSeq =>
+         groupTuples(pairSeq.map(tuple => (findClass(tuple._2, classPair.value), tuple))))
+
 
     split1.collect.
-      foreach(pair => // (predicate, Map[class, Seq[(class, (s,o))]])
-        pair._2.foreach(tuple => // (class, Seq[(class, (s,o))])
-          writeToHDFS(sc, tuple._2.map(_._2), "ff" + pair._1 + "_" + tuple._1)))
+      foreach(pair => // (predicate, Map[class, Seq[(s,o)]])
+        pair._2.foreach(tuple => // (class, Seq[(s,o)])
+          writeToHDFS(sc, tuple._2, "ff" + pair._1 + "_" + tuple._1)))
 
-    // by subject
-    val split2 = otherPredic.
-      map(pair =>
-        (pair._1, pair._2.
-           map(tuple => (findClass(tuple._1, classPair.value), tuple)).
-           groupBy(_._1)))
+    // // by subject
+    // val split2 = otherPredic.
+    //   map(pair =>
+    //     (pair._1,
+    //      groupTuples(pair._2.map(tuple => (findClass(tuple._1, classPair.value), tuple)))))
 
-    split2.collect.
-      foreach(pair => // (predicate, Map[class, Seq[(class, (s,o))]])
-        pair._2.foreach(tuple => // (class, Seq[(class, (s,o))])
-          writeToHDFS(sc, tuple._2.map(_._2), "ff" + tuple._1 + "_" + pair._1)))
+    // split2.collect.
+    //   foreach(pair => // (predicate, Map[class, Seq[(s,o)]])
+    //     pair._2.foreach(tuple => // (class, Seq[(s,o)])
+    //       writeToHDFS(sc, tuple._2, "ff" + tuple._1 + "_" + pair._1)))
 
-    // by subject and object
-    val split3 = otherPredic.
-      map(pair =>
-        (pair._1, pair._2.
-           map(tuple =>
-             ((findClass(tuple._1, classPair.value), findClass(tuple._2, classPair.value)),
-              tuple)).
-           groupBy(_._1)))
+    // // by subject and object
+    // val split3 = otherPredic.
+    //   map(pair =>
+    //     (pair._1,
+    //      groupTuples(pair._2.map(tuple =>
+    //                    ((findClass(tuple._1, classPair.value), findClass(tuple._2, classPair.value)),
+    //                     tuple)))))
 
-    split3.collect.
-      foreach(pair => // (predicate, Map[(class, class), Seq[((class,class), (s,o))]])
-        pair._2.foreach(tuple => // ((class, class), Seq[((class,class), (s,o))])
-          writeToHDFS(sc, tuple._2.map(_._2), "ff" + tuple._1._1 + "_" + pair._1 + "_" + tuple._1._2)))
+    // split3.collect.
+    //   foreach(pair => // (predicate, Map[(class, class), Seq[(s,o)])
+    //     pair._2.foreach(tuple => // ((class, class), Seq[(s,o)])
+    //       writeToHDFS(sc, tuple._2, "ff" + tuple._1._1 + "_" + pair._1 + "_" + tuple._1._2)))
 
     sc.stop()
   }
 
   def writeToHDFS(sc: SparkContext, seq: Seq[Any], path: String) =
     sc.parallelize(seq).
-      saveAsTextFile("hdfs://192.168.0.250:9000/user/root/partitions/" + path)
+      saveAsTextFile("hdfs://localhost:9000/user/jeremybi/partitions/" + path)
 
   def findClass(obj: Long, map: Map[Long, Long]): Long =
     map.get(obj) match {
       case Some(cls) => cls
       case None => -1
     }
+
+  def groupTuples[A,B](seq: Seq[(A,B)]) =
+    seq groupBy (_._1) mapValues (_ map (_._2))
+
 }
