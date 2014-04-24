@@ -12,7 +12,7 @@ object RDFPartitioner {
       .setAppName("RDFPartition")
 
     val sc = new SparkContext(conf)
-    val filePath = "/Users/jeremybi/Desktop/new_data/compress/part-r-00000"
+    val filePath = "/Users/jeremybi/Desktop/new_data/data/compress/part-r-00000"
     val typeHash = -1425683616493199L
 
     // Step 1
