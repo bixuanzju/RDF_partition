@@ -21,7 +21,7 @@ object RDFPartitioner {
     val predicatePair = sc.textFile(filePath).
       map(line => line.split(" ")).
       map(triple => (triple(1).toLong, (triple(0).toLong, triple(2).toLong))).
-      groupByKey
+      groupByKey // TODO: partitionBy
 
     // Step 2
     // Subdivide by object in type predicate
