@@ -14,6 +14,7 @@ object RDFPartitioner {
     val sc = new SparkContext(conf)
     val filePath = "/Users/jeremybi/Desktop/new_data/data/compress/part-r-00000"
     val typeHash = -1425683616493199L
+    var fileNames = Nil: List[String]
 
     // Step 1
     // Divide by predicate
@@ -32,7 +33,10 @@ object RDFPartitioner {
       sc.parallelize(predicatePair.lookup(typeHash)(0)).
       map(_.swap).groupByKey
 
-    classPairs.collect.foreach(pair => writeToHDFS(sc, pair._2, "ff" + pair._1))
+    classPairs.collect.foreach(pair => {
+                                 fileNames = ("ff" + pair._1) :: fileNames
+                                 writeToHDFS(sc, pair._2, fileNames.head)
+                               })
 
     val otherPredic = predicatePair.filter(pair => pair._1 != typeHash)
 
@@ -42,33 +46,51 @@ object RDFPartitioner {
     // by object
     val split1 = otherPredic.
       mapValues(pairSeq =>
-        pairSeq.map(tuple => (findClass(tuple._2, classPair.value), tuple)).groupBy(_._1))
+        pairSeq.map(tuple => (findClass(tuple._2, classPair.value), tuple)).
+          filter(pair => pair._1 != 0).
+          groupBy(_._1))
 
     split1.collect.
       foreach(pair => // (predicate, Map[class, Seq[(class, (s,o))]])
         pair._2.foreach(tuple => // (class, Seq[(class, (s,o))])
-          writeToHDFS(sc, tuple._2.map(_._2), "ff" + pair._1 + "_" + tuple._1)))
+          {
+            fileNames = ("ff" + pair._1 + "_" + tuple._1) :: fileNames
+            writeToHDFS(sc, tuple._2.map(_._2), fileNames.head)
+          }))
 
     // by subject
     val split2 = otherPredic.
       mapValues(pairSeq =>
-        pairSeq.map(tuple => (findClass(tuple._1, classPair.value), tuple)).groupBy(_._1))
+        pairSeq.map(tuple => (findClass(tuple._1, classPair.value), tuple)).
+          filter(pair => pair._1 != 0).
+          groupBy(_._1))
 
     split2.collect.
       foreach(pair => // (predicate, Map[class, Seq[(class, (s,o))]])
         pair._2.foreach(tuple => // (class, Seq[(class, (s,o))])
-          writeToHDFS(sc, tuple._2.map(_._2), "ff" + tuple._1 + "_" + pair._1)))
+          {
+            fileNames = ("ff" + tuple._1 + "_" + pair._1) :: fileNames
+            writeToHDFS(sc, tuple._2.map(_._2), fileNames.head)
+          }))
 
     // by subject and object
     val split3 = otherPredic.
       mapValues(pairSeq =>
-        pairSeq. map(tuple =>
-          ((findClass(tuple._1, classPair.value), findClass(tuple._2, classPair.value)), tuple)). groupBy(_._1))
+        pairSeq.map(tuple =>
+          ((findClass(tuple._1, classPair.value), findClass(tuple._2, classPair.value)), tuple)).
+          filter {case ((c1, c2), _) => c1*c2 != 0}.
+          groupBy(_._1))
 
     split3.collect.
       foreach(pair => // (predicate, Map[(class, class), Seq[((class,class), (s,o))]])
         pair._2.foreach(tuple => // ((class, class), Seq[((class,class), (s,o))])
-          writeToHDFS(sc, tuple._2.map(_._2), "ff" + tuple._1._1 + "_" + pair._1 + "_" + tuple._1._2)))
+          {
+            fileNames = ("ff" + tuple._1._1 + "_" + pair._1 + "_" + tuple._1._2) :: fileNames
+            writeToHDFS(sc, tuple._2.map(_._2), fileNames.head)
+          }))
+
+    // save all valid file names
+    writeToHDFS(sc, fileNames, "filenames")
 
     sc.stop()
   }
@@ -80,7 +102,7 @@ object RDFPartitioner {
   def findClass(obj: Long, map: Map[Long, Long]): Long =
     map.get(obj) match {
       case Some(cls) => cls
-      case None => -1
+      case None => 0
     }
 
 }
