@@ -34,9 +34,8 @@ object RDFPartitioner {
 
     // Step 2
     // Subdivide by object in type predicate
-    // classPair is Map[object, class]
     val classPredic = predicatePair.filter(pair => pair._1 == typeHash)
-
+    // classPair is Map[object, class]
     val classPair  = sc.broadcast(classPredic.first._2.toMap)
 
     // classPairs is RDD[(pred, Map[class, Seq[(class, subject)]])]
