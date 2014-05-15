@@ -38,14 +38,14 @@ object RDFPartitioner {
     // classPair is Map[object, class]
     val classPair  = sc.broadcast(classPredic.first._2.toMap)
 
-    // classPairs is RDD[(pred, Map[class, Seq[(class, subject)]])]
+    // classPairs is RDD[(pred, Map[class, Seq[(subject, class)]])]
     val classPairs = classPredic
-      .map(pair => (pair._1, pair._2.map(_.swap).groupBy(_._1)))
+      .mapValues(pair => pair.groupBy(_._2))
 
     classPairs.foreach(pair => pair._2.foreach(
                          ppair => {
                            fileNames += List("ff" + ppair._1)
-                           writeToHDFS(ppair._2.map(_._2).mkString("\n"),
+                           writeToHDFS(ppair._2.map(_._1).mkString("\n"),
                                        ("ff" + ppair._1))}))
 
     val otherPredic = predicatePair.filter(pair => pair._1 != typeHash)
