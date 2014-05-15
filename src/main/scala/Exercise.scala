@@ -27,11 +27,14 @@ object RDFPartitioner {
     // Step 2
     // Subdivide by object in type predicate
     // classPair is Map[object, class]
-    val classPair  = sc.broadcast(predicatePair.lookup(typeHash)(0).toMap)
+
+    val classPredic = predicatePair.filter(pair => pair._1 == typeHash)
+
+    val classPair  = sc.broadcast(classPredic.first._2.toMap)
 
     val classPairs =
-      sc.parallelize(predicatePair.lookup(typeHash)(0)).
-      map(_.swap).groupByKey
+      sc.parallelize(classPredic.first._2)
+      .map(_.swap).groupByKey
 
     classPairs.collect.foreach(pair => {
                                  fileNames = ("ff" + pair._1) :: fileNames
