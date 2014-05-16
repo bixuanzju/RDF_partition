@@ -19,7 +19,7 @@ object RDFPartitioner {
       .setAppName("RDFPartition")
 
     val sc = new SparkContext(conf)
-    val filePath = "/Users/jeremybi/Desktop/new_data/data/compress/part-r-00000"
+    val filePath = "/Users/jeremybi/Desktop/new_data/data/compress/compress_file"
     val typeHash = -1425683616493199L
     // Accumulators for recording valid filenames
     val fileNames = sc.accumulator(List(): List[String])
@@ -35,8 +35,8 @@ object RDFPartitioner {
     // Step 2
     // Subdivide by object in type predicate
     val classPredic = predicatePair.filter(pair => pair._1 == typeHash)
-    // classPair is Map[object, class]
-    val classPair  = sc.broadcast(classPredic.first._2.toMap)
+    // classMap is Broadcast[Map[object, class]]
+    val classMap  = sc.broadcast(classPredic.first._2.toMap)
 
     // classPairs is RDD[(pred, Map[class, Seq[(subject, class)]])]
     val classPairs = classPredic
@@ -56,7 +56,7 @@ object RDFPartitioner {
     // by object
     val split1 = otherPredic
       .mapValues(pairSeq =>
-      pairSeq.map(tuple => (findClass(tuple._2, classPair.value), tuple))
+      pairSeq.map(tuple => (findClass(tuple._2, classMap.value), tuple))
         .filter(pair => pair._1 != 0)
         .groupBy(_._1))
 
@@ -70,7 +70,7 @@ object RDFPartitioner {
     // by subject
     val split2 = otherPredic
       .mapValues(pairSeq =>
-        pairSeq.map(tuple => (findClass(tuple._1, classPair.value), tuple))
+        pairSeq.map(tuple => (findClass(tuple._1, classMap.value), tuple))
           .filter(pair => pair._1 != 0)
           .groupBy(_._1))
 
@@ -85,7 +85,7 @@ object RDFPartitioner {
     val split3 = otherPredic
       .mapValues(pairSeq =>
         pairSeq.map(tuple =>
-          ((findClass(tuple._1, classPair.value), findClass(tuple._2, classPair.value)), tuple))
+          ((findClass(tuple._1, classMap.value), findClass(tuple._2, classMap.value)), tuple))
           .filter {case ((c1, c2), _) => c1*c2 != 0}
           .groupBy(_._1))
 

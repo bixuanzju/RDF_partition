@@ -13,6 +13,4 @@ libraryDependencies ++= Seq(
     exclude("com.esotericsoftware.minlog", "minlog")
 )
 
-libraryDependencies += "org.apache.hadoop" % "hadoop-client" % "1.2.1"
-
 resolvers += "Akka Repository" at "http://repo.akka.io/releases/"
