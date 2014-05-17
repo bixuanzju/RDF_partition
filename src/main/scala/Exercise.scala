@@ -19,7 +19,7 @@ object RDFPartitioner {
       .setAppName("RDFPartition")
 
     val sc = new SparkContext(conf)
-    val filePath = "/Users/jeremybi/Desktop/new_data/data/compress/compress_file"
+    val filePath = "/Users/jeremybi/Desktop/new_data/data/compress/input_data"
     val typeHash = -1425683616493199L
     // Accumulators for recording valid filenames
     val fileNames = sc.accumulator(List(): List[String])
